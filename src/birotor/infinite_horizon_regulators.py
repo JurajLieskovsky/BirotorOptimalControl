@@ -2,20 +2,17 @@ import scipy
 import numpy as np
 import cvxpy as cp
 
-from . import dynamics
-
-
 class _LQR:
-    def __init__(self, x_eq, u_eq, q, r, dt):
+    def __init__(self, f, df, x_eq, u_eq, q, r):
         self.x_eq = x_eq
         self.u_eq = u_eq
 
         self.q = q
         self.r = r
 
-        assert all(abs(x_eq - dynamics.rk4_f(0, x_eq, u_eq, dt)) <= 1e-8)
+        assert all(abs(x_eq - f(0, x_eq, u_eq)) <= 1e-8)
 
-        self.A, self.B = dynamics.rk4_df(0, x_eq, u_eq, dt)
+        self.A, self.B = df(0, x_eq, u_eq)
 
         self.P = scipy.linalg.solve_discrete_are(self.A, self.B, self.q, self.r)
 
@@ -32,8 +29,8 @@ class _LQR:
 
 
 class LQR(_LQR):
-    def __init__(self, x_eq, u_eq, q, r, dt):
-        super().__init__(x_eq, u_eq, q, r, dt)
+    def __init__(self, f, df, x_eq, u_eq, q, r):
+        super().__init__(f, df, x_eq, u_eq, q, r)
 
         self.K = np.linalg.solve(
             r + self.B.T @ self.P @ self.B, self.B.T @ self.P @ self.A
@@ -47,18 +44,19 @@ class MPC(_LQR):
     def __init__(
         self,
         M,
+        f,
+        df,
         x_eq,
         u_eq,
         q,
         r,
-        dt,
         u_min=-np.inf,
         u_max=np.inf,
         pos_min=-np.inf * np.ones(2),
         pos_max=np.inf * np.ones(2),
         penalty=1e3,
     ):
-        super().__init__(x_eq, u_eq, q, r, dt)
+        super().__init__(f, df, x_eq, u_eq, q, r)
 
         self.x = cp.Variable((6, M + 1))
         self.u = cp.Variable((2, M))
