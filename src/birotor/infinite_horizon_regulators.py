@@ -43,13 +43,13 @@ class LQR(_LQR):
 class MPC(_LQR):
     def __init__(
         self,
-        M,
         f,
         df,
         x_eq,
         u_eq,
         q,
         r,
+        M,
         u_min=-np.inf,
         u_max=np.inf,
         pos_min=-np.inf * np.ones(2),
