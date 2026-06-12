@@ -63,8 +63,7 @@ class MPC(_LQR):
         self.x = cp.Variable((6, M + 1))
         self.u = cp.Variable((2, M))
 
-        slack_min = cp.Variable((2, M + 1))
-        slack_max = cp.Variable((2, M + 1))
+        slack = cp.Variable((2, M + 1))
 
         self.x_init = cp.Parameter(6)
 
@@ -73,10 +72,8 @@ class MPC(_LQR):
             self.x[:, 0] == self.x_init,
             self.u >= u_min - u_eq[:, np.newaxis],
             self.u <= u_max - u_eq[:, np.newaxis],
-            self.x[:2, :] + slack_min >= pos_min[:, np.newaxis] - x_eq[:2, np.newaxis],
-            self.x[:2, :] - slack_max <= pos_max[:, np.newaxis] - x_eq[:2, np.newaxis],
-            slack_min >= 0,
-            slack_max >= 0,
+            self.x[:2, :] + slack >= pos_min[:, np.newaxis] - x_eq[:2, np.newaxis],
+            self.x[:2, :] + slack <= pos_max[:, np.newaxis] - x_eq[:2, np.newaxis],
         ]
 
         LQ = np.linalg.cholesky(self.q)
@@ -86,14 +83,13 @@ class MPC(_LQR):
             cp.sum_squares(LQ.T @ self.x[:, :-1])
             + cp.sum_squares(LR.T @ self.u)
             + cp.quad_form(self.x[:, -1], self.P)
-            + cp.sum(penalty * slack_min)
-            + cp.sum(penalty * slack_max)
+            + penalty * cp.norm1(slack)
         )
 
         self.problem = cp.Problem(objective, constraints)
 
     def input(self, x, _):
         self.x_init.value = x - self.x_eq
-        self.problem.solve(solver=cp.OSQP, warm_starting=True, polish=True)
+        self.problem.solve(solver=cp.OSQP, warm_starting=True, polish=False)
 
         return self.u_eq + self.u.value[:, 0]  # ty:ignore[not-subscriptable]
